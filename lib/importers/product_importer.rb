@@ -70,18 +70,23 @@ module Wm3PerfectaBridge
         next if name.blank? || product.groups.where(url: name.try(:to_url)).present?
         product.groups << find_or_create_group(name)
       end
-      product.save
-      Wm3PerfectaBridge::logger.info("Successfully saved product #{product.master.sku}")
-      # Search in old product relations and create them
-      stored_relations = @stored_relations.select do |v|
-        v[:slave] == row[KEY_FOR_ARTIKELKOD]
+      if product.save
+        Wm3PerfectaBridge::logger.info("Successfully saved product #{product.master.sku}")
+        # Search in old product relations and create them
+        stored_relations = @stored_relations.select do |v|
+          v[:slave] == row[KEY_FOR_ARTIKELKOD]
+        end
+        # Connect stored_relations to relative master product
+        connect_stored_relations(stored_relations, product)
+        # Set prices for product for each price_list
+        set_prices_for_price_lists(row["Prisgrupp"], product)
+        # Set product backorderable
+        stock_item = product.stock_items.find_or_create_by(store: store, product_id: product.id)
+        stock_item.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
+      else
+        debugger
+        Wm3PerfectaBridge::logger.error("Could not save product #{product.master.sku}")
       end
-      # Connect stored_relations to relative master product
-      connect_stored_relations(stored_relations, product)
-      # Set prices for product for each price_list
-      set_prices_for_price_lists(row["Prisgrupp"], product)
-      # Set product backorderable
-      product.stock_items.first.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
     end
 
     private
@@ -98,9 +103,9 @@ module Wm3PerfectaBridge
           next
         end
         # Create product relations
-        product_relations = relations.map{|r| new_product_relations(r, product)}
+        product_relations = relations.map{|r| new_product_relations(r, master_product)}
         # Append product relations
-        master_product.product_relations = product_relations
+        product.product_relations = product_relations
         Wm3PerfectaBridge::logger.info("Relations for product #{master_product.skus} was successfully created from stored relations")
         # Delete product relations from stored relations
         relations.each {|relation| @stored_relations.delete(relation)}
@@ -136,16 +141,20 @@ module Wm3PerfectaBridge
     end
 
     def self.set_prices_for_price_lists(list_category, product)
-      Importer.select("prislista", {"Kod" => list_category}).each do |list|
-        if list["%"].to_f > 0
+      Importer.select("prislista", {"Kod" => list_category}).each do |pl|
+        if pl["%"].to_f > 0
           # Find price list
-          price_list = find_or_create_price_list(list["Beteckning"])
+          price_list = find_or_create_price_list(pl["Beteckning"])
           # Get product price from price list
           price = price_list.prices.find_by(product_id: product.id)
+          unless price
+            Wm3PerfectaBridge::logger.info("Product price could not be found (#{product.master.sku}, #{pl["Beteckning"]})")
+            return
+          end
           # Calculate new price
-          discount = product.master.amount * (list["%"].to_f / 100)
+          discount_multiplier = (100 - pl["%"].to_f)
           # Set new price to product price
-          price.discount = discount
+          price.discount_multiplier = discount_multiplier
           # Save Price
           price.save
         end

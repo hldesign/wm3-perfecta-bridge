@@ -81,7 +81,15 @@ module Wm3PerfectaBridge
           # Find or create property value
           property_value = store.property_values
             .find_or_create_by(property: property, name: value.to_s) do |prop|
+            if property.property_type == "number" && value.match(/[\D]/).present?
+              Wm3PerfectaBridge::logger.error("Can not store property value. (#{value}, #{name})")
+              return
+            end
             prop.presentation = { 'sv' => value}
+          end
+          if property_value.blank?
+            Wm3PerfectaBridge::logger.info("Could not create or find product property. (#{variant.sku}, #{value})")
+            next
           end
           # Connect variant to product property value
           variant.product_properties.new(
