@@ -27,6 +27,8 @@ module Wm3PerfectaBridge
     end
 
     def import_all_files
+      # Create folder
+      FileUtils::mkdir_p Wm3PerfectaBridge::config["local_output_directory"]
       @ftp.chdir(Wm3PerfectaBridge::config["ftp_input_directory"])
 
       files = @ftp.nlst('*')

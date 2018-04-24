@@ -1,4 +1,5 @@
 require "railtie"
+require "fileutils"
 require "wm3-perfecta-bridge-logger.rb"
 require "importer.rb"
 require "wm3_perfecta_bridge/version"
