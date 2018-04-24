@@ -84,7 +84,6 @@ module Wm3PerfectaBridge
         stock_item = product.stock_items.find_or_create_by(store: store, product_id: product.id)
         stock_item.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
       else
-        debugger
         Wm3PerfectaBridge::logger.error("Could not save product #{product.master.sku}")
       end
     end
