@@ -11,7 +11,9 @@ Dir[File.dirname(__FILE__) + '/importers/*.rb'].each {|file| require file }
 module Wm3PerfectaBridge
     VALID_CONFIG_KEYS = [
         "store_id", "file_path", "ftp_host", "ftp_port", "ftp_password",
-        "ftp_user", "ftp_input_directory", "ftp_output_directory"]
+        "ftp_user", "ftp_input_directory", "ftp_output_directory",
+        "local_output_directory"
+    ]
     CONFIG_FILE_NAME = "wm3-perfecta-bridge.yml"
     LOG_FILE_NAME ="wm3_perfecta_bridge.log"
 

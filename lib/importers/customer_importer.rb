@@ -15,7 +15,10 @@ module Wm3PerfectaBridge
 
     def self.import(row)
       # return if "Anv Web" is not defined
-      return unless row["Anv Web"]
+      unless row["Anv Web"]
+        Wm3PerfectaBridge::logger.info("#{row["Företagskod"]} misses Anv Web, customer ignored")
+        return
+      end
       # find customer
       customer = store.customers.joins(:customer_accounts)
         .where(shop_customer_accounts: {
@@ -25,17 +28,11 @@ module Wm3PerfectaBridge
       # initialize new customer if customer is not defined
       unless customer
         customer = store.customers.new
-        # create new default ship address
-        address = customer.addresses.new
-        address.default_ship_address = true
-        address.country = country
-        # Save address
-        address.addressable = customer
+        # Customer should skip registration message
+        customer.primary_account.skip_registration_message = true
+        # Set temporary password
+        customer.primary_account.password = SecureRandom.hex(10)
       end
-      # Customer should skip registration message
-      customer.primary_account.skip_registration_message = true
-      # Set temporary password
-      customer.primary_account.password = SecureRandom.hex(10)
       # create new customer group
       customer_group = store
         .customer_groups
@@ -57,9 +54,11 @@ module Wm3PerfectaBridge
         customer_group.campaign = special_list
       end
       # Save customer and Customer group
-      customer.save
-      customer_group.save
-      Wm3PerfectaBridge::logger.info("Successfully saved #{row["Företagskod"]}")
+      if customer.save && customer_group.save
+        Wm3PerfectaBridge::logger.info("Successfully saved customer #{row["Företagskod"]}")
+      else
+        Wm3PerfectaBridge::logger.info("Unable to save #{row["Företagskod"]}")
+      end
     end
 
     private
@@ -79,9 +78,10 @@ module Wm3PerfectaBridge
       row = row.merge({"adress" => row["Gatupostadress"][7..len]})
 
       # Get default ship address for attribute assignement
-      default_ship_address = customer.addresses.find do |a|
-        a.default_ship_address == true
-      end
+      default_ship_address = customer.addresses.find_or_create_by(
+        default_ship_address: true,
+        country: country
+      )
 
       # Assign attributes
       ["customer", "primary_account", "address"].each do |type|

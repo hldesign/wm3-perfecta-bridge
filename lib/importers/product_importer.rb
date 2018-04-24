@@ -27,8 +27,6 @@ module Wm3PerfectaBridge
       product.master.for_sale = !(row[KEY_FOR_ARTIKELSTATUS] == "Z")
       # Product is customer group specific?
       product.customer_group_specific = (row[KEY_FOR_ARTIKELSTATUS] == "2")
-      # Set product backorderable
-      product.stock_items.first.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
       # Set product price
       product.master.amount = row["Grundpris"]
       # Create and assign product relations
@@ -42,7 +40,7 @@ module Wm3PerfectaBridge
             slave: r["Slav Artikelnummer"],
             relation: r
           }
-          Wm3PerfectaBridge::logger.info("Relation #{r['Slav Artikelnummer']} was stored")
+          Wm3PerfectaBridge::logger.info("Product relation #{r['Slav Artikelnummer']} was stored")
           nil
         end
       end.compact
@@ -73,7 +71,7 @@ module Wm3PerfectaBridge
         product.groups << find_or_create_group(name)
       end
       product.save
-      Wm3PerfectaBridge::logger.info("Successfully saved #{product.master.sku}")
+      Wm3PerfectaBridge::logger.info("Successfully saved product #{product.master.sku}")
       # Search in old product relations and create them
       stored_relations = @stored_relations.select do |v|
         v[:slave] == row[KEY_FOR_ARTIKELKOD]
@@ -82,6 +80,8 @@ module Wm3PerfectaBridge
       connect_stored_relations(stored_relations, product)
       # Set prices for product for each price_list
       set_prices_for_price_lists(row["Prisgrupp"], product)
+      # Set product backorderable
+      product.stock_items.first.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
     end
 
     private

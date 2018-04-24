@@ -34,11 +34,17 @@ module Wm3PerfectaBridge
 
       files.each do |file|
         break if @ftp.closed?
-        @ftp.getbinaryfile(file, "#{Wm3PerfectaBridge::config["local_output_directory"]}/#{file.downcase}") # Use binary since gettextfile will result in encoding errors
+        @ftp.getbinaryfile(file, "#{Wm3PerfectaBridge::config["local_output_directory"]}/#{file}") # Use binary since gettextfile will result in encoding errors
         downloaded_files << file if @ftp.last_response_code == "226" && !@ftp.closed?
         log_request("getbinaryfile('#{file}')")
       end
 
     end
+
+    def shutdown
+      @ftp.close
+      log_request("close")
+    end
+
   end
 end
