@@ -56,7 +56,7 @@ module Wm3PerfectaBridge
         end
       end
       # Create product properties
-      product_properties = ProductMap.properties.map{|t| t.to_a.flatten}.map do |name, type|
+      product_properties = product_properties_map(row).map do |name, type|
         next unless row[name].present?
         # concat all values from KAPACITETET file into json.
         properties = {name => { property_values: [row[name]], property_type: type}}
@@ -89,6 +89,10 @@ module Wm3PerfectaBridge
     end
 
     private
+
+    def self.product_properties_map(row)
+      ProductMap.properties.map{|t| t.to_a.flatten}
+    end
 
     def self.connect_stored_relations(stored_relations, product)
       # Ignore if no relations was found

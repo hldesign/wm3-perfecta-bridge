@@ -22,6 +22,7 @@ module Wm3PerfectaBridge
 
     def self.import(type, name)
       logger.info("Importing new files")
+      ftp_session = nil
 
       begin
         ftp_session = FTPSession.new
@@ -37,5 +38,8 @@ module Wm3PerfectaBridge
 
       logger.info("Importing #{list.count} #{name}")
       list.each { |row| updated << Importer::import(row, name) }
+      logger.info("Complete importing #{type}s (#{updated.count}/#{list.count})")
+      # Delete all downloaded files when finished
+      ftp_session.delete_all_downloaded_files
     end
 end

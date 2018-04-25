@@ -44,13 +44,12 @@ module Wm3PerfectaBridge
       # Find or create price list
       price_list = Importer
         .find("prislista", {KEY_FOR_PRISLISTEID => row[KEY_FOR_PRISLISTA]})
-      customer_group
-        .price_list = find_or_create_price_list(price_list[KEY_FOR_BETECKNING])
+      assign_price_list_to_group(customer_group, price_list, row[KEY_FOR_PRISLISTA])
       # Find or create discount list or campaign list
       special_list = add_campaign_or_discount_list(row[KEY_FOR_FORETAGSKOD])
       if special_list.is_a? Shop::DiscountList
         customer_group.discount_list = special_list
-      elsif list.is_a? Shop::Campaign
+      elsif special_list.is_a? Shop::Campaign
         customer_group.campaign = special_list
       end
       # Save customer and Customer group
@@ -63,22 +62,34 @@ module Wm3PerfectaBridge
 
     private
 
+    def self.assign_price_list_to_group(group, price_list, code)
+      unless price_list.present?
+        Wm3PerfectaBridge::logger.info("Can not find pricelist. (#{code})")
+        return
+      end
+      group.price_list = find_or_create_price_list(price_list[KEY_FOR_BETECKNING])
+    end
+
     def self.assign_attributes(row, customer)
       # Assign attributes for active records, CustomerMap.rb for keys
       # (custoomer, primary account and address)
 
       # Split and merge Referens with hash keys
-      row.merge(row["Referens"].split.each_with_index
-        .map{|v, i| {["namn", "last_name"][i] => v }}
-        .reduce({}, :merge))
+      if row["Referens"].present? && row["Gatupostadress"].present?
+        row.merge(row["Referens"].split.each_with_index
+          .map{|v, i| {["namn", "last_name"][i] => v }}
+          .reduce({}, :merge))
 
-      # Split and merge postal code with hash keys
-      len = row["Gatupostadress"].length
-      row = row.merge({"postadress" => row["Gatupostadress"][0..5]})
-      row = row.merge({"adress" => row["Gatupostadress"][7..len]})
+        # Split and merge postal code with hash keys
+        len = row["Gatupostadress"].length
+        row = row.merge({"postadress" => row["Gatupostadress"][0..5]})
+        row = row.merge({"adress" => row["Gatupostadress"][7..len]})
+      else
+        Wm3PerfectaBridge.logger.info("Can not find columns. (#{row[KEY_FOR_FORETAGSKOD]}, #{row['Referens']}, #{row['Gatupostadress']})")
+      end
 
       # Get default ship address for attribute assignement
-      default_ship_address = customer.addresses.find_or_create_by(
+      default_ship_address = customer.addresses.find_or_initialize_by(
         default_ship_address: true,
         country: country
       )
@@ -99,23 +110,16 @@ module Wm3PerfectaBridge
       customer
     end
 
-    def self.find_or_create_campaign(name)
+    def self.find_or_create_campaign(code)
       return unless code.present?
       row = Importer.find(
         "avtalspriser", {KEY_FOR_AVTALSKOD => code}
       )
-      list = store.campaigns.find_by(
-        name: row[KEY_FOR_BETECKNING]
-      )
-      unless list
-        list = store.campaigns.new({
-          name: row[KEY_FOR_BETECKNING],
-          start_at: row["Fr datum"],
-          end_at: row["Till datum"]
-        })
-        list.save
+      return unless row.present?
+      store.campaigns.find_or_create_by(name: row[KEY_FOR_FORETAGSKOD]) do |l|
+        l.start_at = row["Fr datum"]
+        l.end_at = row["Till datum"]
       end
-      list
     end
 
     def self.find_or_create_discount_list(code)
@@ -123,8 +127,9 @@ module Wm3PerfectaBridge
       row = Importer.find(
         "avtalspriser", {KEY_FOR_AVTALSKOD => code}
       )
+      return unless row.present?
       store.discount_lists
-        .find_or_create_by({ name: row[KEY_FOR_BETECKNING] })
+        .find_or_create_by({ name: row[KEY_FOR_AVTALSKOD] })
     end
 
     def self.campaign_or_discount_list(campaign, code)
@@ -136,17 +141,23 @@ module Wm3PerfectaBridge
       return nil unless code.present?
       prices = Importer.select("avtalspriser", {KEY_FOR_AVTALSKOD => code})
       campaign = prices.map{|g| g["Kampanj"]}.uniq
-      if campaign.length > 2
+      price_list = campaign_or_discount_list(campaign.first == "True", code)
+      unless price_list.present?
+        Wm3PerfectaBridge::logger.info("Could not create customer price list. (#{code})")
+        return nil
       end
-      list = campaign_or_discount_list(campaign.first == "True", code)
       new_prices = prices.map do |price|
-        product = store.products.find_by(skus: price["Kod"])
+        variant = store.variants.find_by(sku: price["Kod"])
+        unless variant
+          Wm3PerfectaBridge::logger.info("Can not find variant for price list. (#{price["Kod"]}, #{code})")
+          next
+        end
         # Get price for product in list
-        new_price = list.prices.new(
+        new_price = price_list.prices.find_or_initialize_by(
           store_id: store.id,
-          variant_id: product.master.id,
-          amount: price["Pris"]
+          variant_id: variant.id
         )
+        new_price.amount = price["Pris"]
         # Find staggering prices
         staggerings = Importer
           .select("staffling", {"Pris-id" => price["Pris-id"]})
@@ -161,9 +172,23 @@ module Wm3PerfectaBridge
         new_price.staggered_prices = staggering_prices
         new_price
       end
-      list.prices = new_prices
-      list.save
-      list
+      valid_new_prices = validated_prices(new_prices, price_list)
+      return nil unless valid_new_prices.present?
+      price_list.prices = valid_new_prices
+      price_list.save
+      price_list
+    end
+
+    def self.validated_prices(new_prices, price_list)
+      return nil unless new_prices.compact.present?
+      pr = new_prices.compact
+      # Store only variant codes, used for checking after multiple variants
+      variant_codes = pr.map(&:variant_id)
+      # Log mutliple variants in same list
+      variant_codes.select{|p| variant_codes.count(p) > 1 }.each do |v|
+        Wm3PerfectaBridge::logger.info("#{v} has multiple prices in same list")
+      end
+      pr.uniq{|v| v.variant_id}
     end
   end
 end

@@ -49,7 +49,8 @@ module Wm3PerfectaBridge
       {"Varvtal" => "number"},
       {"Vikt" => "number"},
       {"Fas" => "number"},
-      {"Prisgrupp" => "text"}
+      {"Prisgrupp" => "text"},
+      {"Extra produkttext" => "text"}
     ]
 
     def self.properties
