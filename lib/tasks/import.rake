@@ -1,6 +1,12 @@
 namespace :wm3_perfecta_bridge do
   desc 'import new customers'
 
+  task(:import_all => :environment) do
+    Wm3PerfectaBridge::import("kund_perf", "customer")
+    Wm3PerfectaBridge::import("perf_art", "product")
+    Wm3PerfectaBridge::import("art_perf", "stock_item")
+  end
+
   task(:import_customers => :environment) do
     Wm3PerfectaBridge::import("kund_perf", "customer")
   end
