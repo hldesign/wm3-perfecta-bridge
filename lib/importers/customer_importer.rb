@@ -174,6 +174,10 @@ module Wm3PerfectaBridge
       end
       valid_new_prices = validated_prices(new_prices, price_list)
       return nil unless valid_new_prices.present?
+      # Return price list if old and new prices are still equal
+      return price_list unless validate_changes(valid_new_prices, price_list)
+      # Destroy all prices and recreate them
+      price_list.prices.destroy_all
       price_list.prices = valid_new_prices
       price_list.save
       price_list
@@ -189,6 +193,33 @@ module Wm3PerfectaBridge
         Wm3PerfectaBridge::logger.info("#{v} has multiple prices in same list")
       end
       pr.uniq{|v| v.variant_id}
+    end
+
+    def self.validate_changes(new_prices, price_list)
+      return false if new_prices.size < price_list.prices.size
+      new_prices.compact.map do |new_price|
+        validate_price_changes(new_price, price_list)
+      end.flatten.include?(false)
+    end
+
+    def self.validate_price_changes(new_price, price_list)
+      variant_price = price_list.prices.find do |price|
+        price.variant_id == new_price.variant.id && price.amount == new_price.amount
+      end
+      return false unless variant_price
+      return true if both_staggered_price_is_blank?(new_price, variant_price)
+      return false if new_price.staggered_prices.size < variant_price.staggered_prices.size
+      [true, new_price.staggered_prices.map do |new_staggered_price|
+        variant_price.staggered_prices.find do |staggered_price|
+          staggered_price.start_quantity == new_staggered_price.start_quantity &&
+            staggered_price.amount == new_staggered_price.amount
+        end.present?
+      end]
+    end
+
+    def self.both_staggered_price_is_blank?(new_price, variant_price)
+      new_price.staggered_prices.blank? == true &&
+        variant_price.staggered_prices.blank? == true
     end
   end
 end

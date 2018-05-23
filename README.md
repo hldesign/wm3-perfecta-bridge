@@ -20,6 +20,11 @@ Or install it yourself as:
 
 To synchronize all pyramid files, run rake wm3_perfecta_bridge:import_all
 
+Available rake tasks:
+  wm3_perfecta_bridge:import_customers
+  wm3_perfecta_bridge:import_products
+  wm3_perfecta_bridge:import_stock_items
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
@@ -30,9 +35,6 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/wm3-perfecta-bridge. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
-## License
-
-The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
 
 ## Code of Conduct
 
