@@ -153,7 +153,7 @@ module Wm3PerfectaBridge
           next
         end
         # Get price for product in list
-        new_price = price_list.prices.find_or_initialize_by(
+        new_price = Shop::Price.new(
           store_id: store.id,
           variant_id: variant.id
         )
