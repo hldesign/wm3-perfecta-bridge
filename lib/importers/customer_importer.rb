@@ -165,7 +165,7 @@ module Wm3PerfectaBridge
         staggering_prices = staggerings.map do |staggering|
           new_price.staggered_prices.new(
             start_quantity: staggering["Stafflat antal"],
-            amount: staggering["Totalt pris"]
+            amount: staggering["Pris exkl. moms"]
           )
         end
         # Set staggering prices
