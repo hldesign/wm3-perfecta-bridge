@@ -163,6 +163,7 @@ module Wm3PerfectaBridge
           .select("staffling", {"Pris-id" => price["Pris-id"]})
         # Assign new staggering prices
         staggering_prices = staggerings.map do |staggering|
+          Wm3PerfectaBridge::logger.info("Found staggered price. (#{price["Kod"]}, #{staggering["Pris exkl. moms"]})")
           new_price.staggered_prices.new(
             start_quantity: staggering["Stafflat antal"],
             amount: staggering["Pris exkl. moms"]
@@ -180,6 +181,10 @@ module Wm3PerfectaBridge
       price_list.prices.destroy_all
       price_list.prices = valid_new_prices
       price_list.save
+      new_prices_presentation = valid_new_prices.map do |p|
+        [p.variant_id, p.amount.to_f, p.staggered_prices.map{|s| [s.start_quantity, s.amount.to_f]}]
+      end
+      Wm3PerfectaBridge::logger.info("Saved new prices. (#{price_list.name}, #{new_prices_presentation})")
       price_list
     end
 
