@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "wm3-perfecta-bridge"
-  spec.version = "1.1.4"
+  spec.version = "1.1.5"
   spec.authors = [""]
   spec.summary = ""
   spec.files = Dir["{lib}/**/*"]

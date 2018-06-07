@@ -28,7 +28,14 @@ module Wm3PerfectaBridge
       # Product is customer group specific?
       product.customer_group_specific = (row[KEY_FOR_ARTIKELSTATUS] == "2")
       # Set product price
-      product.master.amount = row["Grundpris"]
+      if product.master.price.blank?
+        product.master.prices.new do |price|
+          price.amount = row["Grundpris"]
+          price.price_list_id = store.default_price_list.id
+        end
+      else
+        product.master.amount = row["Grundpris"]
+      end
       # Create and assign product relations
       product_relations = Importer.select("reservdel", "Huvud Artikelnummer" => row["Artikelkod"]).map do |r|
         # Check if product is created else save relation for futher use
@@ -144,22 +151,33 @@ module Wm3PerfectaBridge
     end
 
     def self.set_prices_for_price_lists(list_category, product)
+      current_prices = Shop::Price.where(
+        "product_id = ? AND price_list_id IS NOT NULL AND price_list_id != ?",
+        product.id, store.default_price_list.id).to_a
+
       Importer.select("prislista", {"Kod" => list_category}).each do |pl|
         if pl["%"].to_f > 0
           # Find price list
           price_list = find_or_create_price_list(pl["Beteckning"])
           # Get product price from price list
-          price = price_list.prices.find_by(product_id: product.id)
-          unless price
-            Wm3PerfectaBridge::logger.info("Product price could not be found (#{product.master.sku}, #{pl["Beteckning"]})")
-            return
-          end
+          price = price_list.prices.find_or_initialize_by(
+            product_id: product.id,
+            store_id: store.id,
+            variant_id: product.master.id
+          )
           # Calculate new price
+          price.amount = product.master.price.amount
           discount_multiplier = (100 - pl["%"].to_f)
           # Set new price to product price
           price.discount_multiplier = discount_multiplier
           # Save Price
           price.save
+          current_price = current_prices.find{|p| p.id == price.id}
+          current_prices.delete(current_price) if current_price.present?
+        end
+
+        current_prices.each do |p|
+          p.destroy
         end
       end
     end
