@@ -157,7 +157,7 @@ module Wm3PerfectaBridge
           store_id: store.id,
           variant_id: variant.id
         )
-        new_price.amount = price["Pris"]
+        new_price.amount = calculated_price(price, variant)
         # Find staggering prices
         staggerings = Importer
           .select("staffling", {"Pris-id" => price["Pris-id"]})
@@ -186,6 +186,17 @@ module Wm3PerfectaBridge
       end
       Wm3PerfectaBridge::logger.info("Saved new prices. (#{price_list.name}, #{new_prices_presentation})")
       price_list
+    end
+
+    def self.calculated_price(price, variant)
+      case price["Typ"]
+      when "F"
+        price["Pris"]
+      when "R"
+        variant.price.amount * ((100 - price["%"].to_f) / 100)
+      else
+        #TODO: create a unknow price type exception
+      end
     end
 
     def self.validated_prices(new_prices, price_list)
