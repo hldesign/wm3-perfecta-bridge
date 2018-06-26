@@ -72,7 +72,7 @@ module Wm3PerfectaBridge
 
     def self.assign_attributes(row, customer)
       # Assign attributes for active records, CustomerMap.rb for keys
-      # (custoomer, primary account and address)
+      # (customer, primary_account and address)
 
       # Split and merge Referens with hash keys
       if row["Referens"].present? && row["Gatupostadress"].present?
@@ -117,6 +117,7 @@ module Wm3PerfectaBridge
       )
       return unless row.present?
       store.campaigns.find_or_create_by(name: row[KEY_FOR_FORETAGSKOD]) do |l|
+        l.prices_include_tax = false
         l.start_at = row["Fr datum"]
         l.end_at = row["Till datum"]
       end
@@ -128,8 +129,10 @@ module Wm3PerfectaBridge
         "avtalspriser", {KEY_FOR_AVTALSKOD => code}
       )
       return unless row.present?
-      store.discount_lists
-        .find_or_create_by({ name: row[KEY_FOR_AVTALSKOD] })
+      h = {name: row[KEY_FOR_AVTALSKOD]}
+      store.discount_lists.find_or_create_by(h) do |l|
+        l.prices_include_tax = false
+      end
     end
 
     def self.campaign_or_discount_list(campaign, code)
@@ -195,7 +198,7 @@ module Wm3PerfectaBridge
       when "R"
         variant.price.amount * ((100 - price["%"].to_f) / 100)
       else
-        #TODO: create a unknow price type exception
+        variant.price.amount
       end
     end
 
