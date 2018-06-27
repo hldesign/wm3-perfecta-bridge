@@ -202,6 +202,7 @@ module Wm3PerfectaBridge
       when "F"
         new_price.amount = price["Pris"]
       when "R"
+        new_price.amount = variant.price.amount
         new_price.discount = price["%"]
       else
         new_price.amount = variant.price.amount
