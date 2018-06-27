@@ -14,6 +14,7 @@ module Wm3PerfectaBridge
     end
 
     def self.import(row)
+      @row = row
       # return if "Anv Web" is not defined
       unless row["Anv Web"]
         Wm3PerfectaBridge::logger.info("#{row["Företagskod"]} misses Anv Web, customer ignored")
@@ -33,10 +34,6 @@ module Wm3PerfectaBridge
         # Set temporary password
         customer.primary_account.password = SecureRandom.hex(10)
       end
-      # create new customer group
-      customer_group = store
-        .customer_groups
-        .find_or_create_by(name: row["Företagskod"])
       # Set customer to customer group
       customer.customer_group = customer_group
       # Assign customer properties
@@ -44,7 +41,7 @@ module Wm3PerfectaBridge
       # Find or create price list
       price_list = Importer
         .find("prislista", {KEY_FOR_PRISLISTEID => row[KEY_FOR_PRISLISTA]})
-      assign_price_list_to_group(customer_group, price_list, row[KEY_FOR_PRISLISTA])
+      assign_price_list_to_group(price_list, row[KEY_FOR_PRISLISTA])
       # Find or create discount list or campaign list
       special_list = add_campaign_or_discount_list(row[KEY_FOR_FORETAGSKOD])
       if special_list.is_a? Shop::DiscountList
@@ -62,12 +59,17 @@ module Wm3PerfectaBridge
 
     private
 
-    def self.assign_price_list_to_group(group, price_list, code)
+    def self.customer_group
+      @customer_group ||= store.customer_groups
+        .find_or_create_by(name: @row["Företagskod"])
+    end
+
+    def self.assign_price_list_to_group(price_list, code)
       unless price_list.present?
         Wm3PerfectaBridge::logger.info("Can not find pricelist. (#{code})")
         return
       end
-      group.price_list = find_or_create_price_list(price_list[KEY_FOR_BETECKNING])
+      customer_group.price_list = find_or_create_price_list(price_list[KEY_FOR_BETECKNING])
     end
 
     def self.assign_attributes(row, customer)
@@ -156,11 +158,7 @@ module Wm3PerfectaBridge
           next
         end
         # Get price for product in list
-        new_price = Shop::Price.new(
-          store_id: store.id,
-          variant_id: variant.id
-        )
-        new_price.amount = calculated_price(price, variant)
+        new_price = calculated_price(price, variant)
         # Find staggering prices
         staggerings = Importer
           .select("staffling", {"Pris-id" => price["Pris-id"]})
@@ -192,14 +190,24 @@ module Wm3PerfectaBridge
     end
 
     def self.calculated_price(price, variant)
+      new_price = Shop::Price.new(
+        store_id: store.id,
+        variant_id: variant.id
+      )
       case price["Typ"]
       when "F"
-        price["Pris"]
+        new_price.amount = price["Pris"]
       when "R"
-        variant.price.amount * ((100 - price["%"].to_f) / 100)
+        new_price.discount = price["%"]
       else
-        variant.price.amount
+        new_price.amount = variant.price.amount
+        new_price.discount = customer_group
+          &.price_list
+          &.prices
+          &.find_by(variant_id: variant.id)
+          &.discount || 0
       end
+      new_price
     end
 
     def self.validated_prices(new_prices, price_list)
