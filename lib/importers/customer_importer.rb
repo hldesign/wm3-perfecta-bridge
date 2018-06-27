@@ -60,8 +60,12 @@ module Wm3PerfectaBridge
     private
 
     def self.customer_group
-      @customer_group ||= store.customer_groups
-        .find_or_create_by(name: @row["Företagskod"])
+      if @customer_group.try(:name) == @row["Företagskod"]
+        @customer_group
+      else
+        @customer_group = store.customer_groups
+          .find_or_create_by(name: @row["Företagskod"])
+      end
     end
 
     def self.assign_price_list_to_group(price_list, code)
