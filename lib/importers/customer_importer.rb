@@ -236,7 +236,9 @@ module Wm3PerfectaBridge
 
     def self.validate_price_changes(new_price, price_list)
       variant_price = price_list.prices.find do |price|
-        price.variant_id == new_price.variant.id && price.amount == new_price.amount
+        price.variant_id == new_price.variant.id &&
+            price.amount == new_price.amount &&
+            price.discount == new_price.discount
       end
       return false unless variant_price
       return true if both_staggered_price_is_blank?(new_price, variant_price)
