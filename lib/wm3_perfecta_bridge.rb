@@ -1,13 +1,21 @@
-require "railtie"
-require "fileutils"
-require "wm3-perfecta-bridge-logger.rb"
-require "importer.rb"
-require "wm3_perfecta_bridge/version"
-require "map.rb"
-require "ftp_session.rb"
+require 'fileutils'
 
-Dir[File.dirname(__FILE__) + '/maps/*.rb'].each {|file| require file }
-Dir[File.dirname(__FILE__) + '/importers/*.rb'].each {|file| require file }
+require 'wm3_perfecta_bridge/version'
+require 'wm3_perfecta_bridge/wm3-perfecta-bridge-logger.rb'
+
+require 'wm3_perfecta_bridge/importer.rb'
+require 'wm3_perfecta_bridge/importers/customer_importer.rb'
+require 'wm3_perfecta_bridge/importers/product_importer.rb'
+require 'wm3_perfecta_bridge/importers/stock_item_importer.rb'
+
+require 'wm3_perfecta_bridge/map.rb'
+require 'wm3_perfecta_bridge/maps/customer_map.rb'
+require 'wm3_perfecta_bridge/maps/product_map.rb'
+require 'wm3_perfecta_bridge/maps/pyramid_files_map.rb'
+
+require 'wm3_perfecta_bridge/ftp_session.rb'
+
+require 'wm3_perfecta_bridge/railtie' if defined?(Rails)
 
 module Wm3PerfectaBridge
     VALID_CONFIG_KEYS = [
