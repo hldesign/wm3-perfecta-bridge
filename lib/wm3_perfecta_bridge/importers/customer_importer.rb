@@ -17,8 +17,7 @@ module Wm3PerfectaBridge
       @row = row
       # return if "Anv Web" is not defined
       unless row["Anv Web"]
-        Wm3PerfectaBridge::logger.info("#{row["Företagskod"]} misses Anv Web, customer ignored")
-        return
+        raise ArgumentError, "#{row[KEY_FOR_FORETAGSKOD]} misses Anv Web, customer ignored"
       end
       # find customer
       customer = store.customers.joins(:customer_accounts)
@@ -155,105 +154,61 @@ module Wm3PerfectaBridge
         Wm3PerfectaBridge::logger.info("Could not create customer price list. (#{code})")
         return nil
       end
-      new_prices = prices.map do |price|
+      price_codes = prices.map{|p| p["Kod"]}
+      price_list.prices.each do |price|
+        price.destroy if !price_codes.include?(price.variant.sku)
+      end
+      prices.each do |price|
         variant = store.variants.find_by(sku: price["Kod"])
         unless variant
           Wm3PerfectaBridge::logger.info("Can not find variant for price list. (#{price["Kod"]}, #{code})")
           next
         end
-        # Get price for product in list
-        new_price = calculated_price(price, variant)
+        old_price = price_list.prices.find_by(variant_id: variant.id)
+        new_price = compute_price(price, variant, price_list.prices.new(variant_id: variant.id))
+        
+        if old_price&.final_amount != new_price.final_amount
+          old_price&.destroy
+          new_price.save
+        end
+
         # Find staggering prices
         staggerings = Importer
           .select("staffling", {"Pris-id" => price["Pris-id"]})
-        # Assign new staggering prices
-        staggering_prices = staggerings.map do |staggering|
-          Wm3PerfectaBridge::logger.info("Found staggered price. (#{price["Kod"]}, #{staggering["Pris exkl. moms"]})")
-          new_price.staggered_prices.new(
-            start_quantity: staggering["Stafflat antal"],
-            amount: staggering["Pris exkl. moms"]
-          )
+
+        staggerings_quantities = staggerings.map{|s| s["Stafflat antal"].to_i}
+        new_price.staggered_prices.each do |staggered_price|
+          staggered_price.destroy if !staggerings_quantities.include?(staggered_price.start_quantity)
         end
-        # Set staggering prices
-        new_price.staggered_prices = staggering_prices
-        new_price
+
+        staggerings.each do |staggered_price|
+          s = new_price.staggered_prices.find_or_initialize_by(
+            start_quantity: staggered_price["Stafflat antal"]
+          )
+          s.amount = staggered_price["Pris exkl. moms"]
+          s.save
+        end
       end
-      valid_new_prices = validated_prices(new_prices, price_list)
-      return nil unless valid_new_prices.present?
-      # Return price list if old and new prices are still equal
-      return price_list unless validate_changes(valid_new_prices, price_list)
-      # Destroy all prices and recreate them
-      price_list.prices.destroy_all
-      price_list.prices = valid_new_prices
-      price_list.save
-      new_prices_presentation = valid_new_prices.map do |p|
-        [p.variant_id, p.amount.to_f, p.staggered_prices.map{|s| [s.start_quantity, s.amount.to_f]}]
-      end
-      Wm3PerfectaBridge::logger.info("Saved new prices. (#{price_list.name}, #{new_prices_presentation})")
+
       price_list
     end
 
-    def self.calculated_price(price, variant)
-      new_price = Shop::Price.new(
-        store_id: store.id,
-        variant_id: variant.id
-      )
+    def self.compute_price(price, variant, wm3_price)
       case price["Typ"]
       when "F"
-        new_price.amount = price["Pris"]
+        wm3_price.amount = price["Pris"]
       when "R"
-        new_price.amount = variant.price.amount
-        new_price.discount = price["%"]
+        wm3_price.amount = variant.price.amount
+        wm3_price.discount = price["%"]
       else
-        new_price.amount = variant.price.amount
-        new_price.discount = customer_group
+        wm3_price.amount = variant.price.amount
+        wm3_price.discount = customer_group
           &.price_list
           &.prices
           &.find_by(variant_id: variant.id)
           &.discount || 0
       end
-      new_price
-    end
-
-    def self.validated_prices(new_prices, price_list)
-      return nil unless new_prices.compact.present?
-      pr = new_prices.compact
-      # Store only variant codes, used for checking after multiple variants
-      variant_codes = pr.map(&:variant_id)
-      # Log mutliple variants in same list
-      variant_codes.select{|p| variant_codes.count(p) > 1 }.each do |v|
-        Wm3PerfectaBridge::logger.info("#{v} has multiple prices in same list")
-      end
-      pr.uniq{|v| v.variant_id}
-    end
-
-    def self.validate_changes(new_prices, price_list)
-      return false if new_prices.size < price_list.prices.size
-      new_prices.compact.map do |new_price|
-        validate_price_changes(new_price, price_list)
-      end.flatten.include?(false)
-    end
-
-    def self.validate_price_changes(new_price, price_list)
-      variant_price = price_list.prices.find do |price|
-        price.variant_id == new_price.variant.id &&
-            price.amount == new_price.amount &&
-            price.discount == new_price.discount
-      end
-      return false unless variant_price
-      return true if both_staggered_price_is_blank?(new_price, variant_price)
-      return false if new_price.staggered_prices.size < variant_price.staggered_prices.size
-      [true, new_price.staggered_prices.map do |new_staggered_price|
-        variant_price.staggered_prices.find do |staggered_price|
-          staggered_price.start_quantity == new_staggered_price.start_quantity &&
-            staggered_price.amount == new_staggered_price.amount
-        end.present?
-      end]
-    end
-
-    def self.both_staggered_price_is_blank?(new_price, variant_price)
-      new_price.staggered_prices.blank? == true &&
-        variant_price.staggered_prices.blank? == true
+      wm3_price
     end
   end
 end

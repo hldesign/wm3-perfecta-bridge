@@ -29,25 +29,6 @@ module Wm3PerfectaBridge
       product.customer_group_specific = (row[KEY_FOR_ARTIKELSTATUS] == "2")
       # Set product price
       product.master.amount = row["Grundpris"]
-      # Create and assign product relations
-      product_relations = Importer.select("reservdel", "Huvud Artikelnummer" => row["Artikelkod"]).map do |r|
-        # Check if product is created else save relation for futher use
-        slave = store.products.find_by(skus: r["Slav Artikelnummer"])
-        if slave.present?
-          new_product_relations(r, slave)
-        else
-          @stored_relations << {
-            slave: r["Slav Artikelnummer"],
-            relation: r
-          }
-          Wm3PerfectaBridge::logger.info("Product relation #{r['Slav Artikelnummer']} was stored")
-          nil
-        end
-      end.compact
-      # Ignore product relation update if product_relation is empty or relation does exists in files
-      if product_relations.present? || Importer.select("reservdel", "Slav Artikelnummer" => row["Artikelkod"]).blank?
-        product.product_relations = product_relations
-      end
       # Append "Effekt", "Flöde" and "Tryck" to product row if they exists
       values = Importer.select("kapacitet", {"Artikelnummer" => row["Artikelkod"]})
       if values.present?
@@ -55,14 +36,6 @@ module Wm3PerfectaBridge
           row[value] = values.map{|k| k[value] }.to_json
         end
       end
-      # Create product properties
-      product_properties = product_properties_map(row).map do |name, type|
-        next unless row[name].present?
-        # concat all values from KAPACITETET file into json.
-        properties = {name => { property_values: [row[name]], property_type: type}}
-        create_property_values(store, product.master, properties)
-      end.flatten.compact
-      product.product_properties = product_properties
       # Find or create product group and append product to it
       ["Artikeltyp", "Varugrupp", "Artikelstatus"].map do |group|
         name = row[self.const_get("KEY_FOR_#{group.upcase}")]
@@ -72,12 +45,6 @@ module Wm3PerfectaBridge
       end
       if product.save
         Wm3PerfectaBridge::logger.info("Successfully saved product #{product.master.sku}")
-        # Search in old product relations and create them
-        stored_relations = @stored_relations.select do |v|
-          v[:slave] == row[KEY_FOR_ARTIKELKOD]
-        end
-        # Connect stored_relations to relative master product
-        connect_stored_relations(stored_relations, product)
         # Set prices for product for each price_list
         set_prices_for_price_lists(row["Prisgrupp"], product)
         # Set product backorderable
@@ -85,6 +52,22 @@ module Wm3PerfectaBridge
         stock_item.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
       else
         Wm3PerfectaBridge::logger.error("Could not save product #{product.master.sku}")
+      end
+      # Create product properties
+      product_properties_map(row).each do |name, type|
+        unless row[name].present?
+          next unless property = store.properties.find_by(name: name)
+          next unless product_property = product.product_properties.find_by(property_id: property.id)
+          next if product_property.delete
+        end
+        row[name] = "Våt" if row[name] == "VÅT"
+        row[name] = "Torr" if row[name] == "TORR"
+        create_property_values(
+          product.master, 
+          property_name: name,
+          property_value: row[name],
+          property_type: type
+        )
       end
     end
 
@@ -94,30 +77,9 @@ module Wm3PerfectaBridge
       ProductMap.properties.map{|t| t.to_a.flatten}
     end
 
-    def self.connect_stored_relations(stored_relations, product)
-      # Ignore if no relations was found
-      return unless stored_relations.present?
-      # Group relations and handle them to master products
-      stored_relations.group_by{|v| v[:relation]["Huvud Artikelnummer"]}.each do |master, relations|
-        # Fetch master product
-        master_product = store.products.find_by(skus: master)
-        if master_product.blank?
-          Wm3PerfectaBridge::logger.error("Could not find master products skus for master #{master}")
-          next
-        end
-        # Create product relations
-        product_relations = relations.map{|r| new_product_relations(r, master_product)}
-        # Append product relations
-        product.product_relations = product_relations
-        Wm3PerfectaBridge::logger.info("Relations for product #{master_product.skus} was successfully created from stored relations")
-        # Delete product relations from stored relations
-        relations.each {|relation| @stored_relations.delete(relation)}
-      end
-    end
-
-    def self.new_product_relations(pr, product)
+    def self.new_product_relation(pr, product)
       relation(store, pr["Relationstyp"]).product_relations.new({
-        related_product: product
+        related_product_id: product.id
       })
     end
 

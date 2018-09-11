@@ -25,6 +25,13 @@ module Wm3PerfectaBridge
       file.select{|p| p[args.keys.first] == args.values.first}
     end
 
+    def self.clear_old_products(codes)
+      old_codes = store.products.pluck(:skus) - codes
+      store.products.where(skus: old_codes).each do |product|
+        product.trash
+      end
+    end
+
     protected
 
     def self.country
@@ -32,6 +39,9 @@ module Wm3PerfectaBridge
     end
 
     def self.store
+      if Rails.env == "test"
+        return @store ||= Shop::Store.first
+      end
       @store ||= Shop::Store.find(Wm3PerfectaBridge::config["store_id"])
     end
 
@@ -67,38 +77,35 @@ module Wm3PerfectaBridge
       instance_variable_set("@#{instance_name}", group)
     end
 
-    def self.create_property_values(store, variant, properties = {})
-      properties.map do |name, data|
-        property = store.properties.find_or_create_by(name: name) do |new_property|
-          new_property.presentation = { 'sv' => name }
-          new_property.property_type = data[:property_type] || 'text'
-          new_property.measurement_unit = data[:measurement_unit] || nil
-        end
-        variant.product_properties.where(property: property).destroy_all
-        data[:property_values].map do |value|
-          # Do not try to save if nil
-          next if value.blank?
-          # Find or create property value
-          property_value = store.property_values
-            .find_or_create_by(property: property, name: value.to_s) do |prop|
-            if property.property_type == "number" && value.match(/[\D]/).present?
-              Wm3PerfectaBridge::logger.error("Can not store property value. (#{value}, #{name})")
-              return
-            end
-            prop.presentation = { 'sv' => value}
-          end
-          if property_value.blank?
-            Wm3PerfectaBridge::logger.info("Could not create or find product property. (#{variant.sku}, #{value})")
-            next
-          end
-          # Connect variant to product property value
-          variant.product_properties.new(
-            property: property,
-            property_value: property_value,
-            position: data[:position] || 0
-          )
-        end
-      end.flatten
+    def self.create_property_values(variant, **data)
+      property = store.properties.find_or_create_by(name: data[:property_name]) do |new_property|
+        new_property.presentation = { 'sv' => data[:property_name] }
+        new_property.property_type = data[:property_type] || 'text'
+        new_property.measurement_unit = data[:measurement_unit] || nil
+      end
+      # Do not try to save if nil
+      return if data[:property_value].blank?
+      if product_property = variant.product_properties.find_by(property_id: property.id)
+        return if product_property.property_value.name == data[:property_value]
+        product_property.delete
+      end
+      # Find or create property value
+      if property.property_type == "number" && data[:property_value].match(/[\D]/).present?
+        Wm3PerfectaBridge::logger.error("Can not store property value. (#{data[:property_value]}, #{data[:property_name]})")
+        return
+      end
+      property_value = store.property_values.find_or_create_by(property: property, name: data[:property_value].to_s) do |prop|
+        prop.presentation = { 'sv' => data[:property_value] }
+      end
+      if property_value.blank?
+        Wm3PerfectaBridge::logger.info("Could not create or find product property. (#{variant.sku}, #{data[:property_value]})")
+      end
+      # Connect variant to product property value
+      variant.product_properties.create(
+        property: property,
+        property_value: property_value,
+        position: data[:position] || 0
+      )
     end
   end
 end

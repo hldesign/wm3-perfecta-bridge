@@ -49,7 +49,6 @@ module Wm3PerfectaBridge
       {"Varvtal" => "number"},
       {"Vikt" => "number"},
       {"Fas" => "number"},
-      {"Prisgrupp" => "text"},
       {"Extra produkttext" => "text"}
     ]
 

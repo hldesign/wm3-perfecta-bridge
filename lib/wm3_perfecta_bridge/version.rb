@@ -1,3 +1,3 @@
 module Wm3PerfectaBridge
-  VERSION = "1.1.12"
+  VERSION = "1.2.13"
 end

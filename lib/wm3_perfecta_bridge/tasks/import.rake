@@ -1,9 +1,19 @@
 namespace :wm3_perfecta_bridge do
   desc 'import all'
-  task(:import_all => :environment) do
-    Wm3PerfectaBridge::import("kund_perf", "customer")
+  task :import_all, [:folder] => [:environment] do |t, folder|
+    if folder
+      Wm3PerfectaBridge::config["file_path"] << folder
+    end
+
     Wm3PerfectaBridge::import("perf_art", "product")
+    Wm3PerfectaBridge::import("kund_perf", "customer")
     Wm3PerfectaBridge::import("art_perf", "stock_item")
+    Wm3PerfectaBridge::import("reservdel", "product_relation")
+
+    if folder
+      Wm3PerfectaBridge::config["file_path"] = 
+        Wm3PerfectaBridge::config["file_path"].gsub(folder, "") 
+    end
   end
 
   desc 'import customers'
