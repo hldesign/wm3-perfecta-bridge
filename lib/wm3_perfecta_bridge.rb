@@ -57,7 +57,7 @@ module Wm3PerfectaBridge
       @ftp_session&.delete_all_downloaded_files
     end
 
-    def initialize_ftp_session
+    def self.initialize_ftp_session
       begin
         @ftp_session = FTPSession.new
         @ftp_session.import_all_files
