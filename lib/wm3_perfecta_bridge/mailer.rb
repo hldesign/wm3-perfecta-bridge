@@ -15,7 +15,7 @@ module Wm3PerfectaBridge
       end
 
       mail(
-        to: "jesper@hldesign.se",
+        to: email,
         subject: "Perfecta wm3 export",
         body: ''
       )

@@ -29,8 +29,8 @@ module Wm3PerfectaBridge
           (save_path + save_name).open('w') {|file| file.write(file)}
         end
       else
+        Wm3PerfectaBridge::Mailer.send_export(csv_files, type, @store.email).deliver
       end
-      Wm3PerfectaBridge::Mailer.send_export(csv_files, type, @store.email).deliver
     end
 
     def self.prices
