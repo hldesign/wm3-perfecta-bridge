@@ -17,11 +17,16 @@ namespace :wm3_perfecta_bridge do
   end
 
   desc 'import all'
-  task :import_all do
+  task(:import_all => :environment) do
     Wm3PerfectaBridge::import("perf_art", "product")
     Wm3PerfectaBridge::import("kund_perf", "customer")
     Wm3PerfectaBridge::import("art_perf", "stock_item")
     Wm3PerfectaBridge::import("reservdel", "product_relation")
+  end
+
+  desc 'export to csv and send mail'
+  task(:export => :environment) do
+    Wm3PerfectaBridge::Reporter.export("prices")
   end
 
   desc 'import customers'

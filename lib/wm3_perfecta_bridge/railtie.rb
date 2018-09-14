@@ -5,7 +5,6 @@ module Wm3PerfectaBridge
     end
 
     initializer "initializer_wm3_perfecta_bridge" do
-
       # Initializer configuration
       configurations = YAML::load_file(
         "#{Rails.root}/config/#{Wm3PerfectaBridge::CONFIG_FILE_NAME}"

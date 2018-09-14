@@ -15,6 +15,8 @@ require 'wm3_perfecta_bridge/maps/product_map.rb'
 require 'wm3_perfecta_bridge/maps/pyramid_files_map.rb'
 
 require 'wm3_perfecta_bridge/ftp_session.rb'
+require 'wm3_perfecta_bridge/reporter.rb'
+require 'wm3_perfecta_bridge/mailer.rb'
 
 require 'wm3_perfecta_bridge/railtie' if defined?(Rails)
 

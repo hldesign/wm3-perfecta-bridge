@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name          = "wm3_perfecta_bridge"
-  spec.version       = "1.2.13"
+  spec.version       = Wm3PerfectaBridge::VERSION
   spec.authors       = ["Jesper Mellquist"]
   spec.email         = ["jesper.mellquist@hldesign.se"]
 
