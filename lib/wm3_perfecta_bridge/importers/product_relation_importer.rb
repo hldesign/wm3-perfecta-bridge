@@ -9,6 +9,10 @@ module Wm3PerfectaBridge
       @product = store.products.find_by(
         skus: @skus
       )
+      unless @product
+        Wm3PerfectaBridge::logger.info("Could not find product (#{skus})")
+        return
+      end
       current_product_relation_skus.each do |sku|
         destroy_product_relation(sku)
       end
