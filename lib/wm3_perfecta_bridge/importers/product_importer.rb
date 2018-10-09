@@ -49,7 +49,9 @@ module Wm3PerfectaBridge
         set_prices_for_price_lists(row["Prisgrupp"], product)
         # Set product backorderable
         stock_item = product.stock_items.find_or_create_by(store: store, product_id: product.id)
-        stock_item.backorderable = (row[KEY_FOR_BACKORDERABLE] == "2")
+        if stock_item.backorderable != (row[KEY_FOR_BACKORDERABLE] == "2")
+          stock_item.update_attribute(:backorderable, row[KEY_FOR_BACKORDERABLE])
+        end
       else
         Wm3PerfectaBridge::logger.error("Could not save product #{product.master.sku}")
       end

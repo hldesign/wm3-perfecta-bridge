@@ -47,6 +47,7 @@ module Wm3PerfectaBridge
       list.each do |row|
         begin
           updated << Importer::import(row, name)
+          sleep 1
         rescue => e
           Wm3PerfectaBridge::logger.error(e.message)
           failes << e.message
