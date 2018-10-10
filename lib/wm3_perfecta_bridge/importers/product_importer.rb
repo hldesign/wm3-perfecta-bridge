@@ -8,6 +8,7 @@ module Wm3PerfectaBridge
     KEY_FOR_ARTIKELTYP = 'Artikeltyp'
     KEY_FOR_BACKORDERABLE = "Köpbar/beställning webb"
     KEY_FOR_VARUGRUPP = 'Varugrupp'
+    KEY_FOR_SPANNING = "Spänning"
 
     def self.type
       "product"
@@ -56,14 +57,14 @@ module Wm3PerfectaBridge
         Wm3PerfectaBridge::logger.error("Could not save product #{product.master.sku}")
       end
       # Create product properties
+      row["Fas"] = row[KEY_FOR_SPANNING][0] if row[KEY_FOR_SPANNING].present?
       product_properties_map(row).each do |name, type|
         unless row[name].present?
           next unless property = store.properties.find_by(name: name)
           next unless product_property = product.product_properties.find_by(property_id: property.id)
           next if product_property.delete
         end
-        row[name] = "Våt" if row[name] == "VÅT"
-        row[name] = "Torr" if row[name] == "TORR"
+        row[name] = row[name].titleize if (["VÄRME", "VÅT", "TORR"].include?(row[name]))
         create_property_values(
           product.master, 
           property_name: name,
