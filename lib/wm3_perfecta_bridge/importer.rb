@@ -25,11 +25,25 @@ module Wm3PerfectaBridge
       file.select{|p| p[args.keys.first] == args.values.first}
     end
 
-    def self.clear_old_products(codes)
+    # trash products which in wm3 which are absent from
+    # the XML file PERF_ART.
+    def self.trash_absent_products(codes)
       old_codes = store.products.pluck(:skus) - codes
       store.products.where(skus: old_codes).each do |product|
         product.trash
       end
+    end
+    
+    # delete all product property values which no product is using.
+    def self.delete_unused_property_values
+      ids = store
+        .property_values
+        .joins(:product_properties)
+        .group("shop_property_values.id")
+        .having("COUNT(shop_product_properties) <= 0")
+        .pluck("shop_property_values.id")
+      Wm3PerfectaBridge::logger.info("Found #{ids} unused property_values")
+      store.property_values.where(id: ids).destroy_all
     end
 
     protected

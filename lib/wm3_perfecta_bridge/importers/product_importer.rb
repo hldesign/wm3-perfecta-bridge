@@ -57,14 +57,20 @@ module Wm3PerfectaBridge
         Wm3PerfectaBridge::logger.error("Could not save product #{product.master.sku}")
       end
       # Create product properties
+      titleized_names = {
+        "VÄRME" => "Värme",
+        "VÅT" => "Våt",
+        "TORR" => "Torr",
+        "KYLA" => "Kyla"
+      }
       row["Fas"] = row[KEY_FOR_SPANNING][0] if row[KEY_FOR_SPANNING].present?
       product_properties_map(row).each do |name, type|
+        row[name] = titleized_names[row[name]] if titleized_names.keys.include?(row[name])
         unless row[name].present?
           next unless property = store.properties.find_by(name: name)
           next unless product_property = product.product_properties.find_by(property_id: property.id)
           next if product_property.delete
         end
-        row[name] = row[name].titleize if (["VÄRME", "VÅT", "TORR"].include?(row[name]))
         create_property_values(
           product.master, 
           property_name: name,
