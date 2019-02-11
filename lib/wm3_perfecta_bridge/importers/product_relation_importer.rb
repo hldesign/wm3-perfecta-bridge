@@ -19,7 +19,8 @@ module Wm3PerfectaBridge
       new_product_relations.each do |relation|
         add_product_relation(
           relation["Slav Artikelnummer"],
-          relation["Relationstyp"]
+          relation["Relationstyp"],
+          relation["Anmärkning"],
         )
       end
 
@@ -27,12 +28,13 @@ module Wm3PerfectaBridge
 
     private
 
-    def self.add_product_relation(sku, type)
+    def self.add_product_relation(sku, type, description)
       return if current_product_relation_skus.include?(sku)
       return unless product = store.products.find_by(skus: sku)
       @product.product_relations.create(
         related_product_id: product.id,
-        relation_id: relation(type).id
+        relation_id: relation(type).id,
+        description: description,
       )
     end
 
