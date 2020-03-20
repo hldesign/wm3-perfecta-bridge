@@ -55,12 +55,6 @@ module Wm3PerfectaBridge
         end
       end
 
-      # TODO: this functionality should exist in a another class
-      if name == "product"
-        Importer::trash_absent_products(list.map{|s| s["Artikelkod"]}.uniq)
-        Importer::delete_unused_property_values
-      end
-
       logger.info("Complete importing #{type}s (#{updated.count}/#{list.count})")
       # Delete all downloaded files when finished
       @ftp_session&.delete_all_downloaded_files
