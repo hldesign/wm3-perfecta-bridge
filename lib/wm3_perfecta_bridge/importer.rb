@@ -33,7 +33,7 @@ module Wm3PerfectaBridge
         product.trash
       end
     end
-    
+
     # delete all product property values which no product is using.
     def self.delete_unused_property_values
       ids = store
@@ -104,9 +104,6 @@ module Wm3PerfectaBridge
         product_property.delete
       end
       # Find or create property value
-      if property.property_type == "number" 
-        data[:property_value] = data[:property_value].gsub(/[^0-9]/, "")
-      end
       property_value = store.property_values.find_or_create_by(property: property, name: data[:property_value].to_s) do |prop|
         prop.presentation = { 'sv' => data[:property_value] }
       end
