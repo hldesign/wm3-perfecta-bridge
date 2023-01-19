@@ -1,5 +1,5 @@
 require "bundler/setup"
-require "wm3-perfecta-bridge"
+require "wm3_perfecta_bridge"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
