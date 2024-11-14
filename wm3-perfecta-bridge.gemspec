@@ -18,6 +18,7 @@ Gem::Specification.new do |spec|
     f.match(%r{^(test|spec|features)/})
   end
 
-  spec.add_runtime_dependency "rails", ">= 4.2", "< 6.0"
+  spec.add_runtime_dependency "rails", ">= 4.2", "< 8.0"
+  spec.add_development_dependency "rspec-rails"
 end
 

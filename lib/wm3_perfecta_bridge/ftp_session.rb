@@ -1,5 +1,3 @@
-require 'net/ftp'
-
 module Wm3PerfectaBridge
   class FTPSession
     attr_accessor :downloaded_files
